@@ -1,5 +1,5 @@
 CC	= icpc
-CFLAGS	= -std=c++11
+CFLAGS	= -std=c++11 -fopenmp
 
 all: logVS
 
