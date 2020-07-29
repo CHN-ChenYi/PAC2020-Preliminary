@@ -9,6 +9,7 @@
 #include <complex>
 #include <fstream>
 #include <iostream>
+#include <omp.h>
 
 using namespace std;
 
@@ -102,7 +103,7 @@ double logDataVSPrior(const Complex* dat, const Complex* pri, const double* ctf,
                       const double* sigRcp, const int num,
                       const double disturb0) {
   double result = 0.0;
-
+  #pragma omp parallel for schedule(static)
   for (int i = 0; i < num; i++) {
     result += (norm(dat[i] - disturb0 * ctf[i] * pri[i]) * sigRcp[i]);
   }
