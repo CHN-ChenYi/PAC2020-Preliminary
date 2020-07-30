@@ -1,1 +1,4 @@
 .vscode
+logVS
+main.o
+result.dat
