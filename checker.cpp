@@ -18,5 +18,6 @@ int main() {
       return 1;
     }
   }
+  cout << "success" << endl;
   return 0;
 }
