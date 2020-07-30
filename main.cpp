@@ -127,7 +127,7 @@ inline void Server() {
     for (int t = 0; t < K; t++) ans[t] += tmp_ans[i][t];
   }
 
-  for (int t = 0; t < K; t++) fout << t + 1 << ": " << ans[t] << endl;
+  for (int t = 0; t < K; t++) fout << t + 1 << ": " << ans[t] << '\n';
   fout.close();
 
   auto endTime = Clock::now();
@@ -161,6 +161,8 @@ inline void Client() {
 }
 
 int main(int argc, char* argv[]) {
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(0);
   dat_real = new double[m];
   dat_imag = new double[m];
   pri_real = new double[m];
