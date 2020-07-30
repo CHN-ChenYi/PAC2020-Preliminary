@@ -1,4 +1,4 @@
-CC	= icpc
+CC	= mpiicpc
 CFLAGS	= -std=c++11 -fopenmp
 
 all: logVS
