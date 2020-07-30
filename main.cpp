@@ -3,33 +3,31 @@
  * the accumulation from ABS of two groups of complex data
  * *************************************************************************/
 
+#include <omp.h>
 #include <stdio.h>
 
 #include <chrono>
-#include <complex>
 #include <fstream>
 #include <iostream>
-#include <omp.h>
 
 using namespace std;
 
-typedef complex<double> Complex;
 typedef chrono::high_resolution_clock Clock;
 
 const int m = 1638400;  // DO NOT CHANGE!!
 const int K = 100000;   // DO NOT CHANGE!!
 
-double logDataVSPrior(const Complex* dat, const Complex* pri, const double* ctf,
-                      const double* sigRcp, const int num,
+double logDataVSPrior(const double* dat_real, const double* dat_imag,
+                      const double* pri_real, const double* pri_imag,
+                      const double* ctf, const double* sigRcp, const int num,
                       const double disturb0);
 
 int main(int argc, char* argv[]) {
-  Complex* dat = new Complex[m];
-  Complex* pri = new Complex[m];
+  double *dat_real = new double[m], *dat_imag = new double[m];
+  double *pri_real = new double[m], *pri_imag = new double[m];
   double* ctf = new double[m];
   double* sigRcp = new double[m];
   double* disturb = new double[K];
-  double dat0, dat1, pri0, pri1, ctf0, sigRcp0;
 
   /***************************
    * Read data from input.dat
@@ -43,11 +41,8 @@ int main(int argc, char* argv[]) {
   }
   int i = 0;
   while (!fin.eof()) {
-    fin >> dat0 >> dat1 >> pri0 >> pri1 >> ctf0 >> sigRcp0;
-    dat[i] = Complex(dat0, dat1);
-    pri[i] = Complex(pri0, pri1);
-    ctf[i] = ctf0;
-    sigRcp[i] = sigRcp0;
+    fin >> dat_real[i] >> dat_imag[i] >> pri_real[i] >> pri_imag[i] >> ctf[i] >>
+        sigRcp[i];
     i++;
     if (i == m) break;
   }
@@ -79,7 +74,8 @@ int main(int argc, char* argv[]) {
   }
 
   for (unsigned int t = 0; t < K; t++) {
-    double result = logDataVSPrior(dat, pri, ctf, sigRcp, m, disturb[t]);
+    double result = logDataVSPrior(dat_real, dat_imag, pri_real, pri_imag, ctf,
+                                   sigRcp, m, disturb[t]);
     fout << t + 1 << ": " << result << endl;
   }
   fout.close();
@@ -90,8 +86,10 @@ int main(int argc, char* argv[]) {
       chrono::duration_cast<chrono::microseconds>(endTime - startTime);
   cout << "Computing time=" << compTime.count() << " microseconds" << endl;
 
-  delete[] dat;
-  delete[] pri;
+  delete[] dat_real;
+  delete[] dat_imag;
+  delete[] pri_real;
+  delete[] pri_imag;
 
   delete[] ctf;
   delete[] sigRcp;
@@ -99,13 +97,18 @@ int main(int argc, char* argv[]) {
   return EXIT_SUCCESS;
 }
 
-double logDataVSPrior(const Complex* dat, const Complex* pri, const double* ctf,
-                      const double* sigRcp, const int num,
+inline double pow_2(const double& x) { return x * x; }
+
+double logDataVSPrior(const double* dat_real, const double* dat_imag,
+                      const double* pri_real, const double* pri_imag,
+                      const double* ctf, const double* sigRcp, const int num,
                       const double disturb0) {
   double result = 0.0;
-  #pragma omp parallel for schedule(static)
+#pragma omp parallel for reduction(+: result) schedule(static)
   for (int i = 0; i < num; i++) {
-    result += (norm(dat[i] - disturb0 * ctf[i] * pri[i]) * sigRcp[i]);
+    result += (pow_2(dat_real[i] - disturb0 * ctf[i] * pri_real[i]) +
+               pow_2(dat_imag[i] - disturb0 * ctf[i] * pri_imag[i])) *
+              sigRcp[i];
   }
   return result;
 }
