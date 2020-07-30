@@ -15,11 +15,12 @@ using namespace std;
 
 typedef chrono::high_resolution_clock Clock;
 
-const int m = 1638400;  // DO NOT CHANGE!!
-const int K = 100000;   // DO NOT CHANGE!!
+const int m = 1638400; // DO NOT CHANGE!!
+const int K = 100000;  // DO NOT CHANGE!!
 int mpi_id, mpi_size, block_size;
 size_t full_size, remainder_size;
-enum MPI_TAG {
+enum MPI_TAG
+{
   kDatReal,
   kDatImag,
   kPriReal,
@@ -33,15 +34,18 @@ MPI_Status mpi_status;
 double *dat_real, *dat_imag, *pri_real, *pri_imag, *ctf, *sigRcp, *disturb,
     *ans;
 
-inline double pow_2(const double& x) { return x * x; }
+inline double pow_2(const double &x) { return x * x; }
 
-inline double logDataVSPrior(const double* dat_real, const double* dat_imag,
-                             const double* pri_real, const double* pri_imag,
-                             const double* ctf, const double* sigRcp,
-                             const int num, const double disturb0) {
+inline double logDataVSPrior(const double *dat_real, const double *dat_imag,
+                             const double *pri_real, const double *pri_imag,
+                             const double *ctf, const double *sigRcp,
+                             const int num, const double disturb0)
+{
   double result = 0.0;
-#pragma omp parallel for reduction(+ : result) schedule(static)
-  for (int i = 0; i < num; i++) {
+#pragma omp parallel for reduction(+ \
+                                   : result) schedule(static)
+  for (int i = 0; i < num; i++)
+  {
     result += (pow_2(dat_real[i] - disturb0 * ctf[i] * pri_real[i]) +
                pow_2(dat_imag[i] - disturb0 * ctf[i] * pri_imag[i])) *
               sigRcp[i];
@@ -49,10 +53,12 @@ inline double logDataVSPrior(const double* dat_real, const double* dat_imag,
   return result;
 }
 
-inline void Server() {
+inline void Server()
+{
   MPI_Request mpi_request[K];
-  double* tmp_ans[mpi_size];
-  for (int i = 1; i < mpi_size; i++) tmp_ans[i] = new double[K];
+  double *tmp_ans[mpi_size];
+  for (int i = 1; i < mpi_size; i++)
+    tmp_ans[i] = new double[K];
 
   /***************************
    * Read data from input.dat
@@ -60,29 +66,35 @@ inline void Server() {
   ifstream fin;
 
   fin.open("input.dat");
-  if (!fin.is_open()) {
+  if (!fin.is_open())
+  {
     cout << "Error opening file input.dat" << endl;
     exit(1);
   }
   int i = 0;
-  while (!fin.eof()) {
+  while (!fin.eof())
+  {
     fin >> dat_real[i] >> dat_imag[i] >> pri_real[i] >> pri_imag[i] >> ctf[i] >>
         sigRcp[i];
     i++;
-    if (i == m) break;
+    if (i == m)
+      break;
   }
   fin.close();
 
   fin.open("K.dat");
-  if (!fin.is_open()) {
+  if (!fin.is_open())
+  {
     cout << "Error opening file K.dat" << endl;
     exit(1);
   }
   i = 0;
-  while (!fin.eof()) {
+  while (!fin.eof())
+  {
     fin >> disturb[i];
     i++;
-    if (i == K) break;
+    if (i == K)
+      break;
   }
   fin.close();
 
@@ -114,7 +126,8 @@ inline void Server() {
   fout.rdbuf()->pubsetbuf(buffer, length); */
 
   fout.open("result.dat");
-  if (!fout.is_open()) {
+  if (!fout.is_open())
+  {
     cout << "Error opening file for result" << endl;
     exit(1);
   }
@@ -126,13 +139,29 @@ inline void Server() {
   for (int i = 1; i < mpi_size; i++)
     MPI_Irecv(tmp_ans[i], K, MPI_DOUBLE, i, kAns, MPI_COMM_WORLD,
               &mpi_request[i]);
-  for (int i = 1; i < mpi_size; i++) {
+  for (int i = 1; i < mpi_size; i++)
+  {
     MPI_Wait(&mpi_request[i], &mpi_status);
 #pragma omp parallel for schedule(static)
-    for (int t = 0; t < K; t++) ans[t] += tmp_ans[i][t];
+    for (int t = 0; t < K; t++)
+      ans[t] += tmp_ans[i][t];
   }
 
-  for (int t = 0; t < K; t++) fout << t + 1 << ": " << ans[t] << '\n';
+  const unsigned int length = 4194304;
+  static char buffer[length];
+
+  // for (int t = 0; t < K; t++) fout << t + 1 << ": " << ans[t] << '\n';
+
+  int offset = 0;
+
+  for (int t = 0; t < K; t++)
+  {
+    offset += sprintf(buffer + offset, "%d: %6e\n", t + 1, ans[t]);
+  }
+
+  //int len = strlen(buffer);
+  fout.write(buffer, offset);
+
   fout.close();
 
   auto endTime = Clock::now();
@@ -141,10 +170,12 @@ inline void Server() {
       chrono::duration_cast<chrono::microseconds>(endTime - startTime);
   cout << "Computing time=" << compTime.count() << " microseconds" << endl;
 
-  for (int i = 1; i < mpi_size; i++) delete[] tmp_ans[i];
+  for (int i = 1; i < mpi_size; i++)
+    delete[] tmp_ans[i];
 }
 
-inline void Client() {
+inline void Client()
+{
   int m_;
   if (mpi_id == mpi_size - 1)
     m_ = remainder_size;
@@ -165,7 +196,8 @@ inline void Client() {
   MPI_Send(ans, K, MPI_DOUBLE, 0, kAns, MPI_COMM_WORLD);
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
   std::ios::sync_with_stdio(false);
   std::cin.tie(0);
   dat_real = new double[m];
