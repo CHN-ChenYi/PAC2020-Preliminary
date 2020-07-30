@@ -108,6 +108,11 @@ inline void Server() {
 #undef SEND
 
   ofstream fout;
+
+  /* const unsigned int length = 1048576;
+  char buffer[length];
+  fout.rdbuf()->pubsetbuf(buffer, length); */
+
   fout.open("result.dat");
   if (!fout.is_open()) {
     cout << "Error opening file for result" << endl;
