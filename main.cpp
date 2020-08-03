@@ -15,11 +15,12 @@ using namespace std;
 
 typedef chrono::high_resolution_clock Clock;
 
-const int m = 1638400;  // DO NOT CHANGE!!
-const int K = 100000;   // DO NOT CHANGE!!
+const int m = 1638400; // DO NOT CHANGE!!
+const int K = 100000;  // DO NOT CHANGE!!
 int mpi_id, mpi_size, block_size;
 size_t full_size, remainder_size;
-enum MPI_TAG {
+enum MPI_TAG
+{
   kDatReal,
   kDatImag,
   kPriReal,
@@ -37,10 +38,13 @@ inline float pow_2(const float &x) { return x * x; }
 inline float logDataVSPrior(const float *dat_real, const float *dat_imag,
                             const float *pri_real, const float *pri_imag,
                             const float *ctf, const float *sigRcp,
-                            const int num, const float disturb0) {
+                            const int num, const float disturb0)
+{
   float result = 0.0;
-#pragma omp parallel for reduction(+ : result) schedule(static)
-  for (int i = 0; i < num; i++) {
+#pragma omp parallel for reduction(+ \
+                                   : result) schedule(static)
+  for (int i = 0; i < num; i++)
+  {
     result += (pow_2(dat_real[i] - disturb0 * ctf[i] * pri_real[i]) +
                pow_2(dat_imag[i] - disturb0 * ctf[i] * pri_imag[i])) *
               sigRcp[i];
@@ -48,10 +52,12 @@ inline float logDataVSPrior(const float *dat_real, const float *dat_imag,
   return result;
 }
 
-inline void Server() {
+inline void Server()
+{
   MPI_Request mpi_request[K];
   float *tmp_ans[mpi_size];
-  for (int i = 1; i < mpi_size; i++) tmp_ans[i] = new float[K];
+  for (int i = 1; i < mpi_size; i++)
+    tmp_ans[i] = new float[K];
 
   /***************************
    * Read data from input.dat
@@ -59,29 +65,35 @@ inline void Server() {
   ifstream fin;
 
   fin.open("input.dat");
-  if (!fin.is_open()) {
+  if (!fin.is_open())
+  {
     cout << "Error opening file input.dat" << endl;
     exit(1);
   }
   int i = 0;
-  while (!fin.eof()) {
+  while (!fin.eof())
+  {
     fin >> dat_real[i] >> dat_imag[i] >> pri_real[i] >> pri_imag[i] >> ctf[i] >>
         sigRcp[i];
     i++;
-    if (i == m) break;
+    if (i == m)
+      break;
   }
   fin.close();
 
   fin.open("K.dat");
-  if (!fin.is_open()) {
+  if (!fin.is_open())
+  {
     cout << "Error opening file K.dat" << endl;
     exit(1);
   }
   i = 0;
-  while (!fin.eof()) {
+  while (!fin.eof())
+  {
     fin >> disturb[i];
     i++;
-    if (i == K) break;
+    if (i == K)
+      break;
   }
   fin.close();
 
@@ -113,7 +125,8 @@ inline void Server() {
   fout.rdbuf()->pubsetbuf(buffer, length); */
 
   fout.open("result.dat");
-  if (!fout.is_open()) {
+  if (!fout.is_open())
+  {
     cout << "Error opening file for result" << endl;
     exit(1);
   }
@@ -125,10 +138,12 @@ inline void Server() {
   for (int i = 1; i < mpi_size; i++)
     MPI_Irecv(tmp_ans[i], K, MPI_FLOAT, i, kAns, MPI_COMM_WORLD,
               &mpi_request[i]);
-  for (int i = 1; i < mpi_size; i++) {
+  for (int i = 1; i < mpi_size; i++)
+  {
     MPI_Wait(&mpi_request[i], &mpi_status);
 #pragma omp parallel for schedule(static)
-    for (int t = 0; t < K; t++) ans[t] += tmp_ans[i][t];
+    for (int t = 0; t < K; t++)
+      ans[t] += tmp_ans[i][t];
   }
 
   const unsigned int length = 4194304;
@@ -141,41 +156,42 @@ inline void Server() {
   /* for (int t = 0; t < K; t++) {
     offset += sprintf(buffer + offset, "%d: %11.5e\n", t + 1, ans[t]);
   } */
+
 #pragma omp parallel for schedule(static)
-  for(int t=0; t<9; ++t)
+  for (int t = 0; t < 9; ++t)
   {
-    sprintf(buffer + 14*t, "%d:%11.5e", t + 1, ans[t]);
-    buffer[14*t+13]='\n';
+    sprintf(buffer + (t << 4) - (t << 1), "%d:%11.5e", t + 1, ans[t]);
+    buffer[(t << 4) - (t << 1) + 13] = '\n';
   }
 #pragma omp parallel for schedule(static)
-  for(int t=9; t<99; ++t)
+  for (int t = 9; t < 99; ++t)
   {
-    sprintf(buffer + 14*9+15*(t-9), "%d:%11.5e", t + 1, ans[t]);
-    buffer[14*9+15*(t-9)+14]='\n';
+    sprintf(buffer + -9 + (t << 4) - t, "%d:%11.5e", t + 1, ans[t]);
+    buffer[5 + (t << 4) - t] = '\n';
   }
 #pragma omp parallel for schedule(static)
-  for(int t=99; t<999; ++t)
+  for (int t = 99; t < 999; ++t)
   {
-    sprintf(buffer + 14*9+15*90+16*(t-99), "%d:%11.5e", t + 1, ans[t]);
-    buffer[14*9+15*90+16*(t-99)+15]='\n';
+    sprintf(buffer + -108 + (t << 4), "%d:%11.5e", t + 1, ans[t]);
+    buffer[-93 + (t << 4)] = '\n';
   }
 #pragma omp parallel for schedule(static)
-  for(int t=999; t<9999; ++t)
+  for (int t = 999; t < 9999; ++t)
   {
-    sprintf(buffer + 14*9+15*90+16*900+17*(t-999), "%d:%11.5e", t + 1, ans[t]);
-    buffer[14*9+15*90+16*900+17*(t-999)+16]='\n';
+    sprintf(buffer + -1107 + (t << 4) + t, "%d:%11.5e", t + 1, ans[t]);
+    buffer[-1091 + (t << 4) + t] = '\n';
   }
 #pragma omp parallel for schedule(static)
-  for(int t=9999; t<99999; ++t)
+  for (int t = 9999; t < 99999; ++t)
   {
-    sprintf(buffer + 14*9+15*90+16*900+17*9000+18*(t-9999), "%d:%11.5e", t + 1, ans[t]);
-    buffer[14*9+15*90+16*900+17*9000+18*(t-9999)+17]='\n';
+    sprintf(buffer + -11106 + (t << 4) + (t << 1), "%d:%11.5e", t + 1, ans[t]);
+    buffer[-11089 + (t << 4) + (t << 1)] = '\n';
   }
 
-  sprintf(buffer + 14*9+15*90+16*900+17*9000+18*90000, "%d:%11.5e\n", 100000, ans[99999]);
+  sprintf(buffer + 1788876, "%d:%11.5e\n", 100000, ans[99999]);
 
   // int len = strlen(buffer);
-  fout.write(buffer, 14*9+15*90+16*900+17*9000+18*90000+19);
+  fout.write(buffer, 1788895);
 
   fout.close();
 
@@ -185,10 +201,12 @@ inline void Server() {
       chrono::duration_cast<chrono::microseconds>(endTime - startTime);
   cout << "Computing time=" << compTime.count() << " microseconds" << endl;
 
-  for (int i = 1; i < mpi_size; i++) delete[] tmp_ans[i];
+  for (int i = 1; i < mpi_size; i++)
+    delete[] tmp_ans[i];
 }
 
-inline void Client() {
+inline void Client()
+{
   int m_;
   if (mpi_id == mpi_size - 1)
     m_ = remainder_size;
@@ -209,7 +227,8 @@ inline void Client() {
   MPI_Send(ans, K, MPI_FLOAT, 0, kAns, MPI_COMM_WORLD);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   std::ios::sync_with_stdio(false);
   std::cin.tie(0);
   dat_real = new float[m];
