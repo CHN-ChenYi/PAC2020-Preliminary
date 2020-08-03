@@ -138,12 +138,44 @@ inline void Server() {
 
   int offset = 0;
 
-  for (int t = 0; t < K; t++) {
-    offset += sprintf(buffer + offset, "%d: %5e\n", t + 1, ans[t]);
+  /* for (int t = 0; t < K; t++) {
+    offset += sprintf(buffer + offset, "%d: %11.5e\n", t + 1, ans[t]);
+  } */
+#pragma omp parallel for schedule(static)
+  for(int t=0; t<9; ++t)
+  {
+    sprintf(buffer + 14*t, "%d:%11.5e", t + 1, ans[t]);
+    buffer[14*t+13]='\n';
+  }
+#pragma omp parallel for schedule(static)
+  for(int t=9; t<99; ++t)
+  {
+    sprintf(buffer + 14*9+15*(t-9), "%d:%11.5e", t + 1, ans[t]);
+    buffer[14*9+15*(t-9)+14]='\n';
+  }
+#pragma omp parallel for schedule(static)
+  for(int t=99; t<999; ++t)
+  {
+    sprintf(buffer + 14*9+15*90+16*(t-99), "%d:%11.5e", t + 1, ans[t]);
+    buffer[14*9+15*90+16*(t-99)+15]='\n';
+  }
+#pragma omp parallel for schedule(static)
+  for(int t=999; t<9999; ++t)
+  {
+    sprintf(buffer + 14*9+15*90+16*900+17*(t-999), "%d:%11.5e", t + 1, ans[t]);
+    buffer[14*9+15*90+16*900+17*(t-999)+16]='\n';
+  }
+#pragma omp parallel for schedule(static)
+  for(int t=9999; t<99999; ++t)
+  {
+    sprintf(buffer + 14*9+15*90+16*900+17*9000+18*(t-9999), "%d:%11.5e", t + 1, ans[t]);
+    buffer[14*9+15*90+16*900+17*9000+18*(t-9999)+17]='\n';
   }
 
+  sprintf(buffer + 14*9+15*90+16*900+17*9000+18*90000, "%d:%11.5e\n", 100000, ans[99999]);
+
   // int len = strlen(buffer);
-  fout.write(buffer, offset);
+  fout.write(buffer, 14*9+15*90+16*900+17*9000+18*90000+19);
 
   fout.close();
 
