@@ -139,7 +139,7 @@ inline void Server() {
   int offset = 0;
 
   for (int t = 0; t < K; t++) {
-    offset += sprintf(buffer + offset, "%d: %6e\n", t + 1, ans[t]);
+    offset += sprintf(buffer + offset, "%d: %5e\n", t + 1, ans[t]);
   }
 
   // int len = strlen(buffer);
