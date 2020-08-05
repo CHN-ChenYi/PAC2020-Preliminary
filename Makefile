@@ -1,5 +1,5 @@
 CC	= mpiicpc
-CFLAGS	= -std=c++11 -fopenmp -O3 -xHost
+CFLAGS	= -std=c++11 -fopenmp -O2 -no-vec
 
 all: logVS
 
