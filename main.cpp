@@ -4,6 +4,7 @@
  * *************************************************************************/
 
 #include <omp.h>
+#include <immintrin.h>
 
 #include <chrono>
 #include <fstream>
@@ -34,19 +35,36 @@ MPI_Request mpi_request[K];
 float *dat_real, *dat_imag, *pri_real, *pri_imag, *ctf, *sigRcp, *disturb, *ans;
 
 inline float pow_2(const float &x) { return x * x; }
+inline __m256 pow_2(const __m256 &x) { return x * x; }
 
 inline float logDataVSPrior(const float *dat_real, const float *dat_imag,
                             const float *pri_real, const float *pri_imag,
                             const float *ctf, const float *sigRcp,
                             const int num, const float disturb0) {
-  float result = 0.0;
-#pragma omp parallel for reduction(+ : result) schedule(static)
-  for (int i = 0; i < num; i++) {
-    result += (pow_2(dat_real[i] - disturb0 * ctf[i] * pri_real[i]) +
-               pow_2(dat_imag[i] - disturb0 * ctf[i] * pri_imag[i])) *
-              sigRcp[i];
+      float result = 0.0;
+                   union{  float tmp_result[8]; __m256 total;};
+      total = _mm256_setzero_ps();
+#pragma omp parallel shared(total)
+{
+      __m256 _disturb0 = _mm256_broadcast_ss(&disturb0);
+      #pragma omp declare reduction (addps:__m256:omp_out+=omp_in) initializer(omp_priv=_mm256_setzero_ps())
+#pragma omp for schedule(static) reduction(addps:total)
+       for(int i = 0; i < num; i+=8){
+// do not use over 16 registers in total or the processor writes back to L1 cache.
+        __m256 _dat_real0 = _mm256_load_ps(dat_real+i);
+        __m256 _pri_real0 = _mm256_load_ps(pri_real+i);
+        __m256 _dat_imag0 = _mm256_load_ps(dat_imag+i);
+        __m256 _pri_imag0 = _mm256_load_ps(pri_imag+i);
+        __m256 _ctf0 = _mm256_load_ps(ctf+i);
+        __m256 _sigRcp0 = _mm256_load_ps(sigRcp+i);
+
+        total += (pow_2(_dat_real0 - _disturb0 * _ctf0 * _pri_real0) + pow_2(_dat_imag0 - _disturb0 * _ctf0 * _pri_imag0) ) * _sigRcp0;
   }
-  return result;
+}
+  for(int i = 0; i < 8; i++){
+        result += tmp_result[i];
+  }
+      return result;
 }
 
 inline void Server(float *tmp_ans[]) {
