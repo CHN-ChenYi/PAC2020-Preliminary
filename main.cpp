@@ -3,8 +3,8 @@
  * the accumulation from ABS of two groups of complex data
  * *************************************************************************/
 
-#include <omp.h>
 #include <immintrin.h>
+#include <omp.h>
 
 #include <chrono>
 #include <fstream>
@@ -41,30 +41,38 @@ inline float logDataVSPrior(const float *dat_real, const float *dat_imag,
                             const float *pri_real, const float *pri_imag,
                             const float *ctf, const float *sigRcp,
                             const int num, const float disturb0) {
-      float result = 0.0;
-                   union{  float tmp_result[8]; __m256 total;};
-      total = _mm256_setzero_ps();
+  float result = 0.0;
+  union {
+    float tmp_result[8];
+    __m256 total;
+  };
+  total = _mm256_setzero_ps();
 #pragma omp parallel shared(total)
-{
-      __m256 _disturb0 = _mm256_broadcast_ss(&disturb0);
-      #pragma omp declare reduction (addps:__m256:omp_out+=omp_in) initializer(omp_priv=_mm256_setzero_ps())
-#pragma omp for schedule(static) reduction(addps:total)
-       for(int i = 0; i < num; i+=8){
-// do not use over 16 registers in total or the processor writes back to L1 cache.
-        __m256 _dat_real0 = _mm256_load_ps(dat_real+i);
-        __m256 _pri_real0 = _mm256_load_ps(pri_real+i);
-        __m256 _dat_imag0 = _mm256_load_ps(dat_imag+i);
-        __m256 _pri_imag0 = _mm256_load_ps(pri_imag+i);
-        __m256 _ctf0 = _mm256_load_ps(ctf+i);
-        __m256 _sigRcp0 = _mm256_load_ps(sigRcp+i);
+  {
+    __m256 _disturb0 = _mm256_broadcast_ss(&disturb0);
+#pragma omp declare reduction(addps:__m256         \
+                              : omp_out += omp_in) \
+    initializer(omp_priv = _mm256_setzero_ps())
+#pragma omp for schedule(static) reduction(addps : total)
+    for (int i = 0; i < num; i += 8) {
+      // do not use over 16 registers in total or the processor writes back to
+      // L1 cache.
+      __m256 _dat_real0 = _mm256_load_ps(dat_real + i);
+      __m256 _pri_real0 = _mm256_load_ps(pri_real + i);
+      __m256 _dat_imag0 = _mm256_load_ps(dat_imag + i);
+      __m256 _pri_imag0 = _mm256_load_ps(pri_imag + i);
+      __m256 _ctf0 = _mm256_load_ps(ctf + i);
+      __m256 _sigRcp0 = _mm256_load_ps(sigRcp + i);
 
-        total += (pow_2(_dat_real0 - _disturb0 * _ctf0 * _pri_real0) + pow_2(_dat_imag0 - _disturb0 * _ctf0 * _pri_imag0) ) * _sigRcp0;
+      total += (pow_2(_dat_real0 - _disturb0 * _ctf0 * _pri_real0) +
+                pow_2(_dat_imag0 - _disturb0 * _ctf0 * _pri_imag0)) *
+               _sigRcp0;
+    }
   }
-}
-  for(int i = 0; i < 8; i++){
-        result += tmp_result[i];
+  for (int i = 0; i < 8; i++) {
+    result += tmp_result[i];
   }
-      return result;
+  return result;
 }
 
 inline void Server(float *tmp_ans[]) {
@@ -100,12 +108,40 @@ inline void Server(float *tmp_ans[]) {
 
   int offset = 0;
 
-  for (int t = 0; t < K; t++) {
-    offset += sprintf(buffer + offset, "%d: %6e\n", t + 1, ans[t]);
+  /* for (int t = 0; t < K; t++) {
+    offset += sprintf(buffer + offset, "%d: %11.5e\n", t + 1, ans[t]);
+  } */
+
+#pragma omp parallel for schedule(static)
+  for (int t = 0; t < 9; ++t) {
+    sprintf(buffer + (t << 4) - (t << 1), "%d:%11.5e", t + 1, ans[t]);
+    buffer[(t << 4) - (t << 1) + 13] = '\n';
+  }
+#pragma omp parallel for schedule(static)
+  for (int t = 9; t < 99; ++t) {
+    sprintf(buffer + -9 + (t << 4) - t, "%d:%11.5e", t + 1, ans[t]);
+    buffer[5 + (t << 4) - t] = '\n';
+  }
+#pragma omp parallel for schedule(static)
+  for (int t = 99; t < 999; ++t) {
+    sprintf(buffer + -108 + (t << 4), "%d:%11.5e", t + 1, ans[t]);
+    buffer[-93 + (t << 4)] = '\n';
+  }
+#pragma omp parallel for schedule(static)
+  for (int t = 999; t < 9999; ++t) {
+    sprintf(buffer + -1107 + (t << 4) + t, "%d:%11.5e", t + 1, ans[t]);
+    buffer[-1091 + (t << 4) + t] = '\n';
+  }
+#pragma omp parallel for schedule(static)
+  for (int t = 9999; t < 99999; ++t) {
+    sprintf(buffer + -11106 + (t << 4) + (t << 1), "%d:%11.5e", t + 1, ans[t]);
+    buffer[-11089 + (t << 4) + (t << 1)] = '\n';
   }
 
+  sprintf(buffer + 1788876, "%d:%11.5e\n", 100000, ans[99999]);
+
   // int len = strlen(buffer);
-  fout.write(buffer, offset);
+  fout.write(buffer, 1788895);
 
   fout.close();
 }
