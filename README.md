@@ -55,7 +55,9 @@
 
 2. 平台采用 Intel® 至强®处理器。（4枚 Intel Xeon处理器 Platinum 9242 CPU @ 2.30GHz 24 * 8G）
 
-3. 软件环境：
+3. 网络: 100Gb Intel ominipath
+
+4. 软件环境：
    - OS: CentOS 8.0
    - Kernel: 3.10.0-957.12.1.el7
    - GCC: 4.8.5
