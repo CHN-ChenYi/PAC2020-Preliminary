@@ -4,13 +4,12 @@
  * *************************************************************************/
 
 #include <immintrin.h>
+#include <mpi.h>
 #include <omp.h>
 
 #include <chrono>
 #include <fstream>
 #include <iostream>
-
-#include "mpi.h"
 
 using namespace std;
 
@@ -167,16 +166,17 @@ int main(int argc, char *argv[]) {
   else
     m_ = block_size;
 
-  dat_real = new float[m];
-  dat_imag = new float[m];
-  pri_real = new float[m];
-  pri_imag = new float[m];
-  ctf = new float[m];
-  sigRcp = new float[m];
-  disturb = new float[K];
-  ans = new float[K];
+  dat_real = (float *)_mm_malloc(sizeof(float) * m, 32);
+  dat_imag = (float *)_mm_malloc(sizeof(float) * m, 32);
+  pri_real = (float *)_mm_malloc(sizeof(float) * m, 32);
+  pri_imag = (float *)_mm_malloc(sizeof(float) * m, 32);
+  ctf = (float *)_mm_malloc(sizeof(float) * m, 32);
+  sigRcp = (float *)_mm_malloc(sizeof(float) * m, 32);
+  disturb = (float *)_mm_malloc(sizeof(float) * K, 32);
+  ans = (float *)_mm_malloc(sizeof(float) * K, 32);
   float *tmp_ans[mpi_size];
-  for (int i = 1; i < mpi_size; i++) tmp_ans[i] = new float[K];
+  for (int i = 1; i < mpi_size; i++)
+    tmp_ans[i] = (float *)_mm_malloc(sizeof(float) * K, 32);
 
   /***************************
    * Read data from input.dat
@@ -241,15 +241,15 @@ int main(int argc, char *argv[]) {
 
   MPI_Finalize();
 
-  delete[] dat_real;
-  delete[] dat_imag;
-  delete[] pri_real;
-  delete[] pri_imag;
+  _mm_free(dat_real);
+  _mm_free(dat_imag);
+  _mm_free(pri_real);
+  _mm_free(pri_imag);
 
-  delete[] ctf;
-  delete[] sigRcp;
-  delete[] disturb;
-  delete[] ans;
-  for (int i = 1; i < mpi_size; i++) delete[] tmp_ans[i];
+  _mm_free(ctf);
+  _mm_free(sigRcp);
+  _mm_free(disturb);
+  _mm_free(ans);
+  for (int i = 1; i < mpi_size; i++) _mm_free(tmp_ans[i]);
   return EXIT_SUCCESS;
 }
