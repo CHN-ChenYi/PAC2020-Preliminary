@@ -17,6 +17,7 @@ typedef chrono::high_resolution_clock Clock;
 
 const int m = 1638400;  // DO NOT CHANGE!!
 const int K = 100000;   // DO NOT CHANGE!!
+
 int mpi_id, mpi_size, block_size, m_;
 size_t full_size, remainder_size;
 enum MPI_TAG {
@@ -74,30 +75,149 @@ inline float logDataVSPrior(const float *dat_real, const float *dat_imag,
   return result;
 }
 
-inline void Server(float *tmp_ans[]) {
-  ofstream fout;
+inline void Read();
+inline void Compute(float *tmp_ans[]);
+inline void Print();
 
-  /* const unsigned int length = 1048576;
-  char buffer[length];
-  fout.rdbuf()->pubsetbuf(buffer, length); */
+int main(int argc, char *argv[]) {
+  /*******
+   * init
+   * ****/
 
-  fout.open("result.dat");
-  if (!fout.is_open()) {
-    cout << "Error opening file for result" << endl;
-    exit(1);
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(0);
+
+  MPI_Init(&argc, &argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_id);
+  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+
+  block_size = m / mpi_size;
+  full_size = (mpi_size - 1) * block_size, remainder_size = m - full_size;
+  if (mpi_id == mpi_size - 1)
+    m_ = remainder_size;
+  else
+    m_ = block_size;
+
+  dat_real = (float *)_mm_malloc(sizeof(float) * m, 32);
+  dat_imag = (float *)_mm_malloc(sizeof(float) * m, 32);
+  pri_real = (float *)_mm_malloc(sizeof(float) * m, 32);
+  pri_imag = (float *)_mm_malloc(sizeof(float) * m, 32);
+  ctf = (float *)_mm_malloc(sizeof(float) * m, 32);
+  sigRcp = (float *)_mm_malloc(sizeof(float) * m, 32);
+  disturb = (float *)_mm_malloc(sizeof(float) * K, 32);
+  ans = (float *)_mm_malloc(sizeof(float) * K, 32);
+  float *tmp_ans[mpi_size];
+  for (int i = 1; i < mpi_size; i++)
+    tmp_ans[i] = (float *)_mm_malloc(sizeof(float) * K, 32);
+
+  Read();
+
+  /***************************
+   * main computation is here
+   * ************************/
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  decltype(Clock::now()) startTime;
+  if (!mpi_id) startTime = Clock::now();
+
+  Compute(tmp_ans);
+
+  if (!mpi_id) {
+    Print();
+
+    auto endTime = Clock::now();
+
+    auto compTime =
+        chrono::duration_cast<chrono::microseconds>(endTime - startTime);
+    cout << "Computing time=" << compTime.count() << " microseconds" << endl;
   }
 
+  /***********
+   * finalize
+   * ********/
+
+  MPI_Finalize();
+
+  _mm_free(dat_real);
+  _mm_free(dat_imag);
+  _mm_free(pri_real);
+  _mm_free(pri_imag);
+
+  _mm_free(ctf);
+  _mm_free(sigRcp);
+  _mm_free(disturb);
+  _mm_free(ans);
+  for (int i = 1; i < mpi_size; i++) _mm_free(tmp_ans[i]);
+
+  return EXIT_SUCCESS;
+}
+
+inline void Read() {
+  ifstream fin;
+
+  fin.open("input.dat");
+  if (!fin.is_open()) {
+    cout << "Error opening file input.dat" << endl;
+    exit(1);
+  }
+  int i = 0;
+  while (!fin.eof()) {
+    fin >> dat_real[i] >> dat_imag[i] >> pri_real[i] >> pri_imag[i] >> ctf[i] >>
+        sigRcp[i];
+    i++;
+    if (i == block_size * mpi_id) break;
+  }
+  i = 0;
+  while (!fin.eof()) {
+    fin >> dat_real[i] >> dat_imag[i] >> pri_real[i] >> pri_imag[i] >> ctf[i] >>
+        sigRcp[i];
+    i++;
+    if (i == m_) break;
+  }
+  fin.close();
+
+  fin.open("K.dat");
+  if (!fin.is_open()) {
+    cout << "Error opening file K.dat" << endl;
+    exit(1);
+  }
+  i = 0;
+  while (!fin.eof()) {
+    fin >> disturb[i];
+    i++;
+    if (i == K) break;
+  }
+  fin.close();
+}
+
+inline void Compute(float *tmp_ans[]) {
   for (unsigned int t = 0; t < K; t++)
     ans[t] = logDataVSPrior(dat_real, dat_imag, pri_real, pri_imag, ctf, sigRcp,
-                            block_size, disturb[t]);
+                            m_, disturb[t]);
 
-  for (int i = 1; i < mpi_size; i++)
-    MPI_Irecv(tmp_ans[i], K, MPI_FLOAT, i, kAns, MPI_COMM_WORLD,
-              &mpi_request[i]);
-  for (int i = 1; i < mpi_size; i++) {
-    MPI_Wait(&mpi_request[i], &mpi_status);
+  if (mpi_id) {  // send ans to node 0
+    MPI_Send(ans, K, MPI_FLOAT, 0, kAns, MPI_COMM_WORLD);
+  } else {  // collect ans from other nodes and print ans
+    for (int i = 1; i < mpi_size; i++)
+      MPI_Irecv(tmp_ans[i], K, MPI_FLOAT, i, kAns, MPI_COMM_WORLD,
+                &mpi_request[i]);
+    for (int i = 1; i < mpi_size; i++) {
+      MPI_Wait(&mpi_request[i], &mpi_status);
 #pragma omp parallel for schedule(static)
-    for (int t = 0; t < K; t++) ans[t] += tmp_ans[i][t];
+      for (int t = 0; t < K; t++) ans[t] += tmp_ans[i][t];
+    }
+  }
+}
+
+inline void Print() {
+  ofstream fout;
+
+  if (!mpi_id) {
+    fout.open("result.dat");
+    if (!fout.is_open()) {
+      cout << "Error opening file for result" << endl;
+      exit(1);
+    }
   }
 
   const unsigned int length = 4194304;
@@ -143,113 +263,4 @@ inline void Server(float *tmp_ans[]) {
   fout.write(buffer, 1788895);
 
   fout.close();
-}
-
-inline void Client() {
-  for (unsigned int t = 0; t < K; t++)
-    ans[t] = logDataVSPrior(dat_real, dat_imag, pri_real, pri_imag, ctf, sigRcp,
-                            m_, disturb[t]);
-  MPI_Send(ans, K, MPI_FLOAT, 0, kAns, MPI_COMM_WORLD);
-}
-
-int main(int argc, char *argv[]) {
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(0);
-
-  MPI_Init(&argc, &argv);
-  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_id);
-  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-  block_size = m / mpi_size;
-  full_size = (mpi_size - 1) * block_size, remainder_size = m - full_size;
-  if (mpi_id == mpi_size - 1)
-    m_ = remainder_size;
-  else
-    m_ = block_size;
-
-  dat_real = (float *)_mm_malloc(sizeof(float) * m, 32);
-  dat_imag = (float *)_mm_malloc(sizeof(float) * m, 32);
-  pri_real = (float *)_mm_malloc(sizeof(float) * m, 32);
-  pri_imag = (float *)_mm_malloc(sizeof(float) * m, 32);
-  ctf = (float *)_mm_malloc(sizeof(float) * m, 32);
-  sigRcp = (float *)_mm_malloc(sizeof(float) * m, 32);
-  disturb = (float *)_mm_malloc(sizeof(float) * K, 32);
-  ans = (float *)_mm_malloc(sizeof(float) * K, 32);
-  float *tmp_ans[mpi_size];
-  for (int i = 1; i < mpi_size; i++)
-    tmp_ans[i] = (float *)_mm_malloc(sizeof(float) * K, 32);
-
-  /***************************
-   * Read data from input.dat
-   * *************************/
-  ifstream fin;
-
-  fin.open("input.dat");
-  if (!fin.is_open()) {
-    cout << "Error opening file input.dat" << endl;
-    exit(1);
-  }
-  int i = 0;
-  while (!fin.eof()) {
-    fin >> dat_real[i] >> dat_imag[i] >> pri_real[i] >> pri_imag[i] >> ctf[i] >>
-        sigRcp[i];
-    i++;
-    if (i == block_size * mpi_id) break;
-  }
-  i = 0;
-  while (!fin.eof()) {
-    fin >> dat_real[i] >> dat_imag[i] >> pri_real[i] >> pri_imag[i] >> ctf[i] >>
-        sigRcp[i];
-    i++;
-    if (i == m_) break;
-  }
-  fin.close();
-
-  fin.open("K.dat");
-  if (!fin.is_open()) {
-    cout << "Error opening file K.dat" << endl;
-    exit(1);
-  }
-  i = 0;
-  while (!fin.eof()) {
-    fin >> disturb[i];
-    i++;
-    if (i == K) break;
-  }
-  fin.close();
-
-  /***************************
-   * main computation is here
-   * ************************/
-
-  MPI_Barrier(MPI_COMM_WORLD);
-
-  decltype(Clock::now()) startTime;
-  if (!mpi_id) startTime = Clock::now();
-
-  if (!mpi_id)
-    Server(tmp_ans);
-  else
-    Client();
-
-  if (!mpi_id) {
-    auto endTime = Clock::now();
-
-    auto compTime =
-        chrono::duration_cast<chrono::microseconds>(endTime - startTime);
-    cout << "Computing time=" << compTime.count() << " microseconds" << endl;
-  }
-
-  MPI_Finalize();
-
-  _mm_free(dat_real);
-  _mm_free(dat_imag);
-  _mm_free(pri_real);
-  _mm_free(pri_imag);
-
-  _mm_free(ctf);
-  _mm_free(sigRcp);
-  _mm_free(disturb);
-  _mm_free(ans);
-  for (int i = 1; i < mpi_size; i++) _mm_free(tmp_ans[i]);
-  return EXIT_SUCCESS;
 }
