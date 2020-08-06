@@ -126,7 +126,6 @@ int main(int argc, char *argv[]) {
     Print();
 
     auto endTime = Clock::now();
-
     auto compTime =
         chrono::duration_cast<chrono::microseconds>(endTime - startTime);
     cout << "Computing time=" << compTime.count() << " microseconds" << endl;
@@ -212,12 +211,10 @@ inline void Compute(float *tmp_ans[]) {
 inline void Print() {
   ofstream fout;
 
-  if (!mpi_id) {
-    fout.open("result.dat");
-    if (!fout.is_open()) {
-      cout << "Error opening file for result" << endl;
-      exit(1);
-    }
+  fout.open("result.dat");
+  if (!fout.is_open()) {
+    cout << "Error opening file for result" << endl;
+    exit(1);
   }
 
   const unsigned int length = 4194304;
