@@ -48,27 +48,28 @@ inline float logDataVSPrior(const float *dat_real, const float *dat_imag,
   };
   total = _mm256_setzero_ps();
 #pragma omp parallel shared(total)
-  {
-    __m256 _disturb0 = _mm256_broadcast_ss(&disturb0);
-#pragma omp declare reduction(addps:__m256         \
-                              : omp_out += omp_in) \
-    initializer(omp_priv = _mm256_setzero_ps())
+{
+      __m256 _disturb0 = _mm256_broadcast_ss(&disturb0);
+      #pragma omp declare reduction (addps:__m256:omp_out+=omp_in) initializer(omp_priv = _mm256_setzero_ps())
 #pragma omp for schedule(static) reduction(addps : total)
-    for (int i = 0; i < num; i += 8) {
-      // do not use over 16 registers in total or the processor writes back to
-      // L1 cache.
-      __m256 _dat_real0 = _mm256_load_ps(dat_real + i);
-      __m256 _pri_real0 = _mm256_load_ps(pri_real + i);
-      __m256 _dat_imag0 = _mm256_load_ps(dat_imag + i);
-      __m256 _pri_imag0 = _mm256_load_ps(pri_imag + i);
-      __m256 _ctf0 = _mm256_load_ps(ctf + i);
-      __m256 _sigRcp0 = _mm256_load_ps(sigRcp + i);
+       for(int i = 0; i < num; i+=16){
+// do not use over 16 registers in total or the processor writes back to L1 cache.
+        __m256 _dat_real0 = _mm256_load_ps(dat_real+i);
+        __m256 _pri_real0 = _mm256_load_ps(pri_real+i);
+        __m256 _dat_imag0 = _mm256_load_ps(dat_imag+i);
+        __m256 _pri_imag0 = _mm256_load_ps(pri_imag+i);
+        __m256 _ctf0 = _mm256_load_ps(ctf+i);
+        __m256 _sigRcp0 = _mm256_load_ps(sigRcp+i);
+        __m256 _dat_real1 = _mm256_load_ps(dat_real+i+8);
+        __m256 _pri_real1 = _mm256_load_ps(pri_real+i+8);
+        __m256 _dat_imag1 = _mm256_load_ps(dat_imag+i+8);
+        __m256 _pri_imag1 = _mm256_load_ps(pri_imag+i+8);
+        __m256 _ctf1 = _mm256_load_ps(ctf+i+8);
+        __m256 _sigRcp1 = _mm256_load_ps(sigRcp+i+8);
 
-      total += (pow_2(_dat_real0 - _disturb0 * _ctf0 * _pri_real0) +
-                pow_2(_dat_imag0 - _disturb0 * _ctf0 * _pri_imag0)) *
-               _sigRcp0;
-    }
+        total += (pow_2(_dat_real0 - _disturb0 * _ctf0 * _pri_real0) + pow_2(_dat_imag0 - _disturb0 * _ctf0 * _pri_imag0) ) * _sigRcp0 + (pow_2(_dat_real1 - _disturb0 * _ctf1 * _pri_real1) + pow_2(_dat_imag1 - _disturb0 * _ctf1 * _pri_imag1) ) * _sigRcp1;
   }
+}
   for (int i = 0; i < 8; i++) {
     result += tmp_result[i];
   }
