@@ -34,8 +34,10 @@ MPI_Status mpi_status;
 MPI_Request mpi_request[K];
 float *dat_real, *dat_imag, *pri_real, *pri_imag, *ctf, *sigRcp, *disturb, *ans;
 
-inline float pow_2(const float &x) { return x * x; }
-inline __m256 pow_2(const __m256 &x) { return x * x; }
+template <typename T>
+inline T pow_2(const T &x) {
+  return x * x;
+}
 
 inline float logDataVSPrior(const float *dat_real, const float *dat_imag,
                             const float *pri_real, const float *pri_imag,
@@ -189,10 +191,45 @@ inline void Read() {
   fin.close();
 }
 
+const int OMP_M_BLOCK_SIZE = 500000;
+// const int OMP_K_BLOCK_SIZE = 100000;
 inline void Compute(float *tmp_ans[]) {
-  for (unsigned int t = 0; t < K; t++)
-    ans[t] = logDataVSPrior(dat_real, dat_imag, pri_real, pri_imag, ctf, sigRcp,
-                            m_, disturb[t]);
+  for (unsigned int m_start = 0, m_len, m_flag = true; m_flag;
+       m_start += OMP_M_BLOCK_SIZE) {
+    if (m_start + 2 * OMP_M_BLOCK_SIZE < m_) {
+      m_len = OMP_M_BLOCK_SIZE;
+    } else {
+      m_len = m_ - m_start;
+      m_flag = false;
+    }
+    for (unsigned int t = 0; t < K; t++)
+      ans[t] =
+          logDataVSPrior(dat_real + m_start, dat_imag + m_start,
+                         pri_real + m_start, pri_imag + m_start, ctf + m_start,
+                         sigRcp + m_start, m_len, disturb[t]);
+    // for (unsigned int k_start = 0, k_end, k_flag = true; k_flag;
+    //      k_start += OMP_K_BLOCK_SIZE) {
+    //   if (k_start + 2 * OMP_K_BLOCK_SIZE < K) {
+    //     k_end = k_start + OMP_K_BLOCK_SIZE;
+    //   } else {
+    //     k_end = K;
+    //     k_flag = false;
+    //   }
+    //   if (!m_start) {
+    //     for (unsigned int t = k_start; t < k_end; t++)
+    //       ans[t] = logDataVSPrior(dat_real + m_start, dat_imag + m_start,
+    //                               pri_real + m_start, pri_imag + m_start,
+    //                               ctf + m_start, sigRcp + m_start, m_len,
+    //                               disturb[t]);
+    //   } else {
+    //     for (unsigned int t = k_start; t < k_end; t++)
+    //       ans[t] += logDataVSPrior(dat_real + m_start, dat_imag + m_start,
+    //                                pri_real + m_start, pri_imag + m_start,
+    //                                ctf + m_start, sigRcp + m_start, m_len,
+    //                                disturb[t]);
+    //   }
+    // }
+  }
 
   if (mpi_id) {  // send ans to node 0
     MPI_Send(ans, K, MPI_FLOAT, 0, kAns, MPI_COMM_WORLD);

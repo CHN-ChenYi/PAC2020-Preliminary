@@ -3,7 +3,7 @@
 #include <cstdlib>
 using namespace std;
 
-const int K = 100000;   // DO NOT CHANGE!!
+#include "config.h"
 
 char colon;
 double x, y;
