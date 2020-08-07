@@ -217,18 +217,18 @@ inline void Print() {
     exit(1);
   }
 
-  const unsigned int length = 4194304;
+  const unsigned int length = 8*4194304;
   static char buffer[length];
 
-  // for (int t = 0; t < K; t++) fout << t + 1 << ": " << ans[t] << '\n';
+  // for (int t = 0; t < K; t++) fout << t + 1 << ": "8 << ans[t] << '\n';
 
   int offset = 0;
 
-  /* for (int t = 0; t < K; t++) {
+  for (int t = 0; t < K; t++) {
     offset += sprintf(buffer + offset, "%d: %11.5e\n", t + 1, ans[t]);
-  } */
+  }
 
-#pragma omp parallel for schedule(static)
+/* #pragma omp parallel for schedule(static)
   for (int t = 0; t < 9; ++t) {
     sprintf(buffer + (t << 4) - (t << 1), "%d:%11.5e", t + 1, ans[t]);
     buffer[(t << 4) - (t << 1) + 13] = '\n';
@@ -256,8 +256,8 @@ inline void Print() {
 
   sprintf(buffer + 1788876, "%d:%11.5e\n", 100000, ans[99999]);
 
-  // int len = strlen(buffer);
-  fout.write(buffer, 1788895);
+  int len = strlen(buffer); */
+  fout.write(buffer, offset);
 
   fout.close();
 }
