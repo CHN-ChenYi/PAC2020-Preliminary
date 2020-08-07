@@ -17,6 +17,7 @@ typedef chrono::high_resolution_clock Clock;
 
 const int m = 1638400;  // DO NOT CHANGE!!
 const int K = 100000;   // DO NOT CHANGE!!
+// #include "config.h"
 
 int mpi_id, mpi_size, block_size, m_;
 size_t full_size, remainder_size;
@@ -171,7 +172,7 @@ const int OMP_M_BLOCK_SIZE = 550000;
 inline void Compute(float *tmp_ans[]) {
   for (unsigned int m_start = 0, m_len, m_flag = true; m_flag;
        m_start += OMP_M_BLOCK_SIZE) {
-    if (m_start + 1.75 * OMP_M_BLOCK_SIZE < m_) {
+    if (m_start + 1.7 * OMP_M_BLOCK_SIZE < m_) {
       m_len = OMP_M_BLOCK_SIZE;
     } else {
       m_len = m_ - m_start;
