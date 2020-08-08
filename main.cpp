@@ -63,12 +63,12 @@ int main(int argc, char *argv[]) {
    * init
    * ****/
 
-  std::ios::sync_with_stdio(false);
-  std::cin.tie(0);
-
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_id);
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(0);
 
   block_size = m / mpi_size;
   full_size = (mpi_size - 1) * block_size, remainder_size = m - full_size;
@@ -114,8 +114,6 @@ int main(int argc, char *argv[]) {
    * finalize
    * ********/
 
-  MPI_Finalize();
-
   _mm_free(dat_real);
   _mm_free(dat_imag);
   _mm_free(pri_real);
@@ -126,6 +124,8 @@ int main(int argc, char *argv[]) {
   _mm_free(disturb);
   _mm_free(ans);
   for (int i = 1; i < mpi_size; i++) _mm_free(tmp_ans[i]);
+
+  MPI_Finalize();
 
   return EXIT_SUCCESS;
 }
