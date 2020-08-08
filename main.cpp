@@ -168,11 +168,11 @@ inline void Read() {
   fin.close();
 }
 
-const int OMP_M_BLOCK_SIZE = 550000;
+const int OMP_M_BLOCK_SIZE = 800000;
 inline void Compute(float *tmp_ans[]) {
   for (unsigned int m_start = 0, m_len, m_flag = true; m_flag;
        m_start += OMP_M_BLOCK_SIZE) {
-    if (m_start + 1.7 * OMP_M_BLOCK_SIZE < m_) {
+    if (m_start + 1.2 * OMP_M_BLOCK_SIZE < m_) {
       m_len = OMP_M_BLOCK_SIZE;
     } else {
       m_len = m_ - m_start;
@@ -219,8 +219,6 @@ inline void Print() {
   const unsigned int length = 8388608;
   static char buffer[length];
 
-  // for (int t = 0; t < K; t++) fout << t + 1 << ": "8 << ans[t] << '\n';
-
   int offset = 0;
 
   for (int t = 0; t < K; t++) {
@@ -232,36 +230,6 @@ inline void Print() {
   }
 
   fout.write(buffer, offset);
-
-  /* #pragma omp parallel for schedule(static)
-    for (int t = 0; t < 9; ++t) {
-      sprintf(buffer + (t << 4) - (t << 1), "%d:%11.5e", t + 1, ans[t]);
-      buffer[(t << 4) - (t << 1) + 13] = '\n';
-    }
-  #pragma omp parallel for schedule(static)
-    for (int t = 9; t < 99; ++t) {
-      sprintf(buffer + -9 + (t << 4) - t, "%d:%11.5e", t + 1, ans[t]);
-      buffer[5 + (t << 4) - t] = '\n';
-    }
-  #pragma omp parallel for schedule(static)
-    for (int t = 99; t < 999; ++t) {
-      sprintf(buffer + -108 + (t << 4), "%d:%11.5e", t + 1, ans[t]);
-      buffer[-93 + (t << 4)] = '\n';
-    }
-  #pragma omp parallel for schedule(static)
-    for (int t = 999; t < 9999; ++t) {
-      sprintf(buffer + -1107 + (t << 4) + t, "%d:%11.5e", t + 1, ans[t]);
-      buffer[-1091 + (t << 4) + t] = '\n';
-    }
-  #pragma omp parallel for schedule(static)
-    for (int t = 9999; t < 99999; ++t) {
-      sprintf(buffer + -11106 + (t << 4) + (t << 1), "%d:%11.5e", t + 1,
-  ans[t]); buffer[-11089 + (t << 4) + (t << 1)] = '\n';
-    }
-
-    sprintf(buffer + 1788876, "%d:%11.5e\n", 100000, ans[99999]);
-
-    int len = strlen(buffer); */
 
   fout.close();
 }
